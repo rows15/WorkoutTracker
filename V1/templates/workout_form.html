@@ -8,6 +8,20 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel="stylesheet">
+    <style>
+        /* Ensure notes input spans multiple rows */
+        .notes-container {
+            height: 100%;
+        }
+        .notes-input {
+            height: 100%;
+            min-height: 100px; /* Approx height of effort + cardio radios */
+        }
+        /* Future use box height approximation */
+        .future-box {
+            min-height: 300px; /* Approx 8 rows, adjust as needed */
+        }
+    </style>
 </head>
 <body>
     <div class="container py-3">
@@ -43,44 +57,54 @@
         function addExercise(name, id, sets, order = exerciseCount) {
             let exerciseIdx = exerciseCount++;
             let exerciseHtml = `
-                <div class="exercise" data-exercise-idx="${exerciseIdx}">
-                    <h3>${name}</h3>
-                    <input type="hidden" name="exercises[${exerciseIdx}][${id ? 'exercise_id' : 'name'}]" value="${id || name}">
-                    <input type="hidden" name="exercises[${exerciseIdx}][order]" value="${order}">
-                    <div class="sets">
-                        ${Array.from({length: sets || 1}, (_, i) => `
-                            <div class="set" data-set-idx="${i}">
-                                <div class="mb-3">
-                                    <label>Weight (kg)</label>
-                                    <input type="number" step="0.5" name="exercises[${exerciseIdx}][sets][${i}][weight]" class="form-control">
-                                </div>
-                                <div class="mb-3">
-                                    <label>Reps</label>
-                                    <input type="number" name="exercises[${exerciseIdx}][sets][${i}][reps]" class="form-control">
-                                </div>
-                                <div class="mb-3">
-                                    <label>Perceived Effort (f)</label>
-                                    <div>
-                                        <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="-" checked> -
-                                        ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="${j}"> ${j}`).join(' ')}
+                <div class="exercise card mb-3" data-exercise-idx="${exerciseIdx}">
+                    <div class="card-body">
+                        <h3 class="card-title">${name}</h3>
+                        <input type="hidden" name="exercises[${exerciseIdx}][${id ? 'exercise_id' : 'name'}]" value="${id || name}">
+                        <input type="hidden" name="exercises[${exerciseIdx}][order]" value="${order}">
+                        <div class="sets">
+                            ${Array.from({length: sets || 1}, (_, i) => `
+                                <div class="set card mb-2" data-set-idx="${i}">
+                                    <div class="card-body">
+                                        <h5 class="card-subtitle mb-2 text-muted">Set ${i + 1}</h5>
+                                        <div class="row g-3">
+                                            <div class="col-6">
+                                                <label class="form-label">Weight (kg)</label>
+                                                <input type="number" step="0.5" name="exercises[${exerciseIdx}][sets][${i}][weight]" class="form-control">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">Reps</label>
+                                                <input type="number" name="exercises[${exerciseIdx}][sets][${i}][reps]" class="form-control">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">Perceived Effort (f)</label>
+                                                <div>
+                                                    <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="-" checked> -
+                                                    ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="${j}"> ${j}`).join(' ')}
+                                                </div>
+                                                <label class="form-label mt-2">Cardio Effort (c)</label>
+                                                <div>
+                                                    <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="-" checked> -
+                                                    ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="${j}"> ${j}`).join(' ')}
+                                                </div>
+                                            </div>
+                                            <div class="col-6 notes-container">
+                                                <label class="form-label">Obs</label>
+                                                <input type="text" name="exercises[${exerciseIdx}][sets][${i}][notes]" class="form-control notes-input">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label>Cardio Effort (c)</label>
-                                    <div>
-                                        <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="-" checked> -
-                                        ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="${j}"> ${j}`).join(' ')}
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label>Notes</label>
-                                    <input type="text" name="exercises[${exerciseIdx}][sets][${i}][notes]" class="form-control">
-                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="card future-box mb-2">
+                            <div class="card-body">
+                                <!-- Reserved for future use -->
                             </div>
-                        `).join('')}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-success add-set">+ Add Set</button>
+                        <button type="button" class="btn btn-sm btn-danger remove-set" ${sets <= 1 ? 'disabled' : ''}>- Remove Set</button>
                     </div>
-                    <button type="button" class="btn btn-sm btn-success add-set">+ Add Set</button>
-                    <button type="button" class="btn btn-sm btn-danger remove-set" ${sets <= 1 ? 'disabled' : ''}>- Remove Set</button>
                 </div>
             `;
             $('#exercises').append(exerciseHtml);
@@ -133,19 +157,39 @@
             let idx = parseInt(exerciseDiv.data('exercise-idx'));
             let setCount = exerciseDiv.find('.set').length;
             console.log('Exercise idx:', idx, 'New set idx:', setCount);
-            let newSet = exerciseDiv.find('.set').first().clone();
-            newSet.attr('data-set-idx', setCount);
-            newSet.find('input').each(function() {
-                let name = $(this).attr('name').replace(/\[sets\]\[\d+\]/, `[sets][${setCount}]`);
-                $(this).attr('name', name);
-                if ($(this).attr('type') !== 'radio') {
-                    $(this).val('');
-                } else {
-                    $(this).prop('checked', false);
-                }
-            });
-            newSet.find(`input[name="exercises[${idx}][sets][${setCount}][f]"][value="-"]`).prop('checked', true);
-            newSet.find(`input[name="exercises[${idx}][sets][${setCount}][c]"][value="-"]`).prop('checked', true);
+            let newSet = `
+                <div class="set card mb-2" data-set-idx="${setCount}">
+                    <div class="card-body">
+                        <h5 class="card-subtitle mb-2 text-muted">Set ${setCount + 1}</h5>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label">Weight (kg)</label>
+                                <input type="number" step="0.5" name="exercises[${idx}][sets][${setCount}][weight]" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Reps</label>
+                                <input type="number" name="exercises[${idx}][sets][${setCount}][reps]" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Perceived Effort (f)</label>
+                                <div>
+                                    <input type="radio" name="exercises[${idx}][sets][${setCount}][f]" value="-" checked> -
+                                    ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${idx}][sets][${setCount}][f]" value="${j}"> ${j}`).join(' ')}
+                                </div>
+                                <label class="form-label mt-2">Cardio Effort (c)</label>
+                                <div>
+                                    <input type="radio" name="exercises[${idx}][sets][${setCount}][c]" value="-" checked> -
+                                    ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${idx}][sets][${setCount}][c]" value="${j}"> ${j}`).join(' ')}
+                                </div>
+                            </div>
+                            <div class="col-6 notes-container">
+                                <label class="form-label">Obs</label>
+                                <input type="text" name="exercises[${idx}][sets][${setCount}][notes]" class="form-control notes-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
             exerciseDiv.find('.sets').append(newSet);
             updateRemoveButtons(exerciseDiv);
         });
