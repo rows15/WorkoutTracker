@@ -132,6 +132,7 @@
             let exerciseDiv = $(this).closest('.exercise');
             let idx = parseInt(exerciseDiv.data('exercise-idx'));
             let setCount = exerciseDiv.find('.set').length;
+            console.log('Exercise idx:', idx, 'New set idx:', setCount);
             let newSet = exerciseDiv.find('.set').first().clone();
             newSet.attr('data-set-idx', setCount);
             newSet.find('input').each(function() {

@@ -1,0 +1,60 @@
+{
+  "id": 6,
+  "title": "teste_oficial222",
+  "date": "2025-06-18",
+  "duration": 53,
+  "exercises": [
+    {
+      "name": "1-exercicio1, increment1- no add after",
+      "order": 1,
+      "sets": [
+        {
+          "set_number": 1,
+          "weight": 11.0,
+          "reps": 11,
+          "f": 1,
+          "c": 1,
+          "notes": "11"
+        },
+        {
+          "set_number": 2,
+          "weight": 22.0,
+          "reps": 22,
+          "f": 2,
+          "c": 2,
+          "notes": "22"
+        }
+      ]
+    },
+    {
+      "name": "2-exercicio 2, increment2 - add after",
+      "order": 2,
+      "sets": [
+        {
+          "set_number": 1,
+          "weight": 11.0,
+          "reps": 11,
+          "f": 1,
+          "c": 1,
+          "notes": "11"
+        },
+        {
+          "set_number": 2,
+          "weight": 33.0,
+          "reps": 33,
+          "f": 3,
+          "c": 3,
+          "notes": "33"
+        },
+        {
+          "set_number": 3,
+          "weight": 55.0,
+          "reps": 55,
+          "f": 5,
+          "c": 5,
+          "notes": "55"
+        }
+      ]
+    }
+  ]
+}

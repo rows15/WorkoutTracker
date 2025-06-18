@@ -113,7 +113,7 @@ def save_workout():
         'exercises': []
     }
 
-    for idx in exercise_indices:
+    for idx in sorted(exercise_indices, key=int):
         exercise_name = request.form.get(f'exercises[{idx}][name]')
         exercise_id = request.form.get(f'exercises[{idx}][exercise_id]')
         order = int(request.form.get(f'exercises[{idx}][order]', idx))
@@ -146,7 +146,7 @@ def save_workout():
             'sets': []
         }
 
-        for set_idx in set_indices:
+        for set_idx in sorted(set_indices, key=int):
             weight = float(request.form.get(f'exercises[{idx}][sets][{set_idx}][weight]', 0) or 0)
             reps = int(request.form.get(f'exercises[{idx}][sets][{set_idx}][reps]', 0) or 0)
             f = request.form.get(f'exercises[{idx}][sets][{set_idx}][f]')
@@ -201,19 +201,21 @@ def past_workouts():
 @app.route('/past_workouts/<int:workout_id>')
 def workout_details(workout_id):
     workout = Workout.query.get_or_404(workout_id)
-    sets = WorkoutSet.query.filter_by(workout_id=workout_id).all()
+    sets = WorkoutSet.query.filter_by(workout_id=workout_id).order_by(WorkoutSet.set_number).all()
     exercises = {}
     for s in sets:
         if s.exercise_id not in exercises:
             exercise = Exercise.query.get(s.exercise_id)
             exercises[s.exercise_id] = {
                 'name': exercise.name,
-                'order': s.set_number,  # Default order
+                'order': s.set_number,  # Use first set's order as proxy
                 'sets': []
             }
         exercises[s.exercise_id]['sets'].append(s)
-    # Sort exercises by order
+    # Sort exercises by order, then sort sets within each exercise
     sorted_exercises = sorted(exercises.items(), key=lambda x: x[1]['order'])
+    for _, ex in sorted_exercises:
+        ex['sets'].sort(key=lambda s: s.set_number)
     return render_template('workout_details.html', workout=workout, exercises=sorted_exercises)
 
 @app.route('/past_exercises')
@@ -239,8 +241,12 @@ def analysis():
 @app.route('/exercises/autocomplete')
 def exercises_autocomplete():
     term = request.args.get('term', '')
-    exercises = Exercise.query.filter(Exercise.name.ilike(f'%{term}%')).limit(10).all()
-    return jsonify([e.name for e in exercises])
+    exercises = Exercise.query.filter_by(name=term).first()
+    if not exercises:
+        exercises = Exercise(name=term)
+        db.session.add(exercises)
+        db.session.commit()
+    return jsonify({'id': exercises.id, 'name': exercises.name})
 
 @app.route('/preset/new', methods=['GET', 'POST'])
 def preset_new():
