@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workout</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-3">
+        <h1>Choose a Workout</h1>
+        <div class="list-group">
+            {% for preset in presets %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('workout_form_preset', preset_id=preset.id) }}">{{ preset.name }}</a>
+                    <a href="{{ url_for('preset_edit', preset_id=preset.id) }}" class="btn btn-sm btn-secondary">✏️</a>
+                </div>
+            {% endfor %}
+            <a href="{{ url_for('workout_form_custom') }}" class="list-group-item list-group-item-action">[Custom]</a>
+            <a href="{{ url_for('preset_new') }}" class="list-group-item list-group-item-action">[Setup]</a>
+        </div>
+        <a href="{{ url_for('main_menu') }}" class="btn btn-primary back-button">Back to Menu</a>
+    </div>
+</body>
+</html>

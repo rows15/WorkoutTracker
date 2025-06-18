@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Main Menu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-3">
+        <h1>Workout Tracker</h1>
+        <ul class="list-group">
+            <li class="list-group-item"><a href="{{ url_for('workout') }}">Workout</a></li>
+            <li class="list-group-item"><a href="{{ url_for('past_workouts') }}">Past Workouts</a></li>
+            <li class="list-group-item"><a href="{{ url_for('past_exercises') }}">Past Exercises</a></li>
+            <li class="list-group-item"><a href="{{ url_for('analysis') }}">Analysis (Coming Soon)</a></li>
+        </ul>
+    </div>
+</body>
+</html>

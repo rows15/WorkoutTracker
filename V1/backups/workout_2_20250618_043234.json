@@ -1,0 +1,30 @@
+{
+  "id": 2,
+  "title": "ex2",
+  "date": "2025-06-18",
+  "duration": 0,
+  "exercises": [
+    {
+      "name": "2",
+      "order": 0,
+      "sets": [
+        {
+          "set_number": 2,
+          "weight": 3.0,
+          "reps": 3,
+          "f": 3,
+          "c": 3,
+          "notes": "3"
+        },
+        {
+          "set_number": 1,
+          "weight": 0.0,
+          "reps": 0,
+          "f": 2,
+          "c": 2,
+          "notes": "2"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workout Form</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-3">
+        <h1>{{ preset.name if preset else "Custom Workout" }}</h1>
+        <form method="POST" id="workoutForm">
+            <div class="mb-3">
+                <label for="title" class="form-label">Workout Title</label>
+                <input type="text" class="form-control" id="title" name="title" value="{{ preset.name if preset else '' }}" required>
+            </div>
+            <input type="hidden" id="duration" name="duration" value="0">
+            <input type="hidden" id="presetId" value="{{ preset.id if preset else '' }}">
+            <div class="mb-3">
+                <button type="button" id="startTimer" class="btn btn-primary">Start</button>
+                <button type="button" id="pauseTimer" class="btn btn-secondary" disabled>Pause</button>
+                <span id="timerDisplay" class="ms-3">00:00</span>
+            </div>
+            <div id="exercises"></div>
+            <div class="mb-3">
+                <label for="customExercise" class="form-label">Add Custom Exercise</label>
+                <input type="text" class="form-control" id="customExercise">
+                <button type="button" id="addExercise" class="btn btn-primary mt-2">Add</button>
+            </div>
+            <button type="submit" class="btn btn-success">Finish</button>
+        </form>
+        <a href="{{ url_for('workout') }}" class="btn btn-primary back-button">Back to Workouts</a>
+    </div>
+    <script>
+        let timerStart = null;
+        let elapsed = 0;
+        let running = false;
+        let exerciseCount = 0;
+
+        function addExercise(name, id, sets, order = exerciseCount) {
+            let exerciseIdx = exerciseCount++;
+            let exerciseHtml = `
+                <div class="exercise" data-exercise-idx="${exerciseIdx}">
+                    <h3>${name}</h3>
+                    <input type="hidden" name="exercises[${exerciseIdx}][${id ? 'exercise_id' : 'name'}]" value="${id || name}">
+                    <input type="hidden" name="exercises[${exerciseIdx}][order]" value="${order}">
+                    <div class="sets">
+                        ${Array.from({length: sets || 1}, (_, i) => `
+                            <div class="set" data-set-idx="${i}">
+                                <div class="mb-3">
+                                    <label>Weight (kg)</label>
+                                    <input type="number" step="0.5" name="exercises[${exerciseIdx}][sets][${i}][weight]" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label>Reps</label>
+                                    <input type="number" name="exercises[${exerciseIdx}][sets][${i}][reps]" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label>Perceived Effort (f)</label>
+                                    <div>
+                                        <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="-" checked> -
+                                        ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][f]" value="${j}"> ${j}`).join(' ')}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label>Cardio Effort (c)</label>
+                                    <div>
+                                        <input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="-" checked> -
+                                        ${[1,2,3,4,5,6].map(j => `<input type="radio" name="exercises[${exerciseIdx}][sets][${i}][c]" value="${j}"> ${j}`).join(' ')}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label>Notes</label>
+                                    <input type="text" name="exercises[${exerciseIdx}][sets][${i}][notes]" class="form-control">
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-success add-set">+ Add Set</button>
+                    <button type="button" class="btn btn-sm btn-danger remove-set" ${sets <= 1 ? 'disabled' : ''}>- Remove Set</button>
+                </div>
+            `;
+            $('#exercises').append(exerciseHtml);
+        }
+
+        $(document).ready(function() {
+            let presetId = $('#presetId').val();
+            if (presetId) {
+                $.get(`/preset/${presetId}/exercises`, function(data) {
+                    console.log('Preset exercises:', data);
+                    data.forEach(ex => addExercise(ex.name, ex.id, ex.sets, ex.order));
+                });
+            }
+        });
+
+        $('#startTimer').click(function() {
+            if (!running) {
+                timerStart = Date.now() - elapsed;
+                running = true;
+                $(this).prop('disabled', true);
+                $('#pauseTimer').prop('disabled', false);
+                updateTimer();
+            }
+        });
+
+        $('#pauseTimer').click(function() {
+            if (running) {
+                elapsed = Date.now() - timerStart;
+                running = false;
+                $(this).prop('disabled', true);
+                $('#startTimer').prop('disabled', false);
+            }
+        });
+
+        function updateTimer() {
+            if (running) {
+                elapsed = Date.now() - timerStart;
+                let seconds = Math.floor(elapsed / 1000);
+                let minutes = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+                $('#timerDisplay').text(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+                $('#duration').val(Math.floor(elapsed / 1000));
+                setTimeout(updateTimer, 1000);
+            }
+        }
+
+        $(document).on('click', '.add-set', function() {
+            console.log('Add set clicked');
+            let exerciseDiv = $(this).closest('.exercise');
+            let idx = parseInt(exerciseDiv.data('exercise-idx'));
+            let setCount = exerciseDiv.find('.set').length;
+            let newSet = exerciseDiv.find('.set').first().clone();
+            newSet.attr('data-set-idx', setCount);
+            newSet.find('input').each(function() {
+                let name = $(this).attr('name').replace(/\[sets\]\[\d+\]/, `[sets][${setCount}]`);
+                $(this).attr('name', name);
+                if ($(this).attr('type') !== 'radio') {
+                    $(this).val('');
+                } else {
+                    $(this).prop('checked', false);
+                }
+            });
+            newSet.find(`input[name="exercises[${idx}][sets][${setCount}][f]"][value="-"]`).prop('checked', true);
+            newSet.find(`input[name="exercises[${idx}][sets][${setCount}][c]"][value="-"]`).prop('checked', true);
+            exerciseDiv.find('.sets').append(newSet);
+            updateRemoveButtons(exerciseDiv);
+        });
+
+        $(document).on('click', '.remove-set', function() {
+            console.log('Remove set clicked');
+            let exerciseDiv = $(this).closest('.exercise');
+            exerciseDiv.find('.set').last().remove();
+            updateRemoveButtons(exerciseDiv);
+        });
+
+        function updateRemoveButtons(exerciseDiv) {
+            let setCount = exerciseDiv.find('.set').length;
+            exerciseDiv.find('.remove-set').prop('disabled', setCount <= 1);
+        }
+
+        $('#customExercise').autocomplete({
+            source: '/exercises/autocomplete',
+            minLength: 2
+        });
+
+        $('#addExercise').click(function() {
+            let name = $('#customExercise').val();
+            console.log('Add exercise:', name, 'New exerciseCount:', exerciseCount);
+            if (name) {
+                addExercise(name, null, 1);
+                $('#customExercise').val('');
+            }
+        });
+
+        $('#workoutForm').submit(function(e) {
+            console.log('Form submitted');
+            console.log('Form data:', $(this).serializeArray());
+        });
+    </script>
+</body>
+</html>

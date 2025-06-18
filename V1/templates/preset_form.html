@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ preset.name if preset else "New Preset" }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-3">
+        <h1>{{ preset.name if preset else "Create Preset" }}</h1>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="name" class="form-label">Preset Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ preset.name if preset else '' }}" required>
+            </div>
+            <div id="exercises">
+                {% for exercise in exercises|default([]) %}
+                    <div class="exercise" data-exercise-idx="{{ loop.index0 }}">
+                        <h3>Exercise</h3>
+                        <div class="mb-3">
+                            <label>Exercise Name</label>
+                            <input type="text" class="form-control exercise-name" name="exercises[{{ loop.index0 }}][name]" value="{{ exercise.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Number of Sets</label>
+                            <input type="number" min="1" name="exercises[{{ loop.index0 }}][set_count]" value="{{ exercise.sets|default(1) }}" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label>Order</label>
+                            <input type="number" min="1" name="exercises[{{ loop.index0 }}][order]" value="{{ exercise.order|default(loop.index0 + 1) }}" class="form-control">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger remove-exercise">Remove Exercise</button>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                <label for="newExercise" class="form-label">Add Exercise</label>
+                <input type="text" class="form-control" id="newExercise">
+                <button type="button" id="addExercise" class="btn btn-primary mt-2">Add</button>
+            </div>
+            <button type="submit" class="btn btn-success">Save</button>
+            {% if preset %}
+                <button type="submit" name="delete" value="delete" class="btn btn-danger">Delete</button>
+            {% endif %}
+        </form>
+        <a href="{{ url_for('workout') }}" class="btn btn-primary back-button">Exit</a>
+    </div>
+    <script>
+        let exerciseCount = {{ exercises|default([])|length|tojson|safe }};
+
+        $('.exercise-name').autocomplete({
+            source: '/exercises/autocomplete',
+            minLength: 2
+        });
+
+        $(document).on('click', '.remove-exercise', function() {
+            $(this).closest('.exercise').remove();
+        });
+
+        $('#addExercise').click(function() {
+            let name = $('#newExercise').val();
+            if (name) {
+                let newExercise = $(`
+                    <div class="exercise" data-exercise-idx="${exerciseCount}">
+                        <h3>Exercise</h3>
+                        <div class="mb-3">
+                            <label>Exercise Name</label>
+                            <input type="text" class="form-control exercise-name" name="exercises[${exerciseCount}][name]" value="${name}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Number of Sets</label>
+                            <input type="number" min="1" name="exercises[${exerciseCount}][set_count]" value="1" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label>Order</label>
+                            <input type="number" min="1" name="exercises[${exerciseCount}][order]" value="${exerciseCount + 1}" class="form-control">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger remove-exercise">Remove Exercise</button>
+                    </div>
+                `);
+                $('#exercises').append(newExercise);
+                newExercise.find('.exercise-name').autocomplete({
+                    source: '/exercises/autocomplete',
+                    minLength: 2
+                });
+                $('#newExercise').val('');
+                exerciseCount++;
+            }
+        });
+    </script>
+</body>
+</html>
