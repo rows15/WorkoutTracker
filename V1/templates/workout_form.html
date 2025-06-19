@@ -9,17 +9,22 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel="stylesheet">
     <style>
-        /* Ensure notes input spans multiple rows */
         .notes-container {
             height: 100%;
         }
         .notes-input {
             height: 100%;
-            min-height: 100px; /* Approx height of effort + cardio radios */
+            min-height: 100px;
         }
-        /* Future use box height approximation */
         .future-box {
-            min-height: 300px; /* Approx 8 rows, adjust as needed */
+            min-height: 300px;
+        }
+        .history-list {
+            list-style: none;
+            padding: 0;
+        }
+        .history-list li {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -57,7 +62,7 @@
         function addExercise(name, id, sets, order = exerciseCount) {
             let exerciseIdx = exerciseCount++;
             let exerciseHtml = `
-                <div class="exercise card mb-3" data-exercise-idx="${exerciseIdx}">
+                <div class="exercise card mb-3" data-exercise-idx="${exerciseIdx}" data-exercise-id="${id || ''}">
                     <div class="card-body">
                         <h3 class="card-title">${name}</h3>
                         <input type="hidden" name="exercises[${exerciseIdx}][${id ? 'exercise_id' : 'name'}]" value="${id || name}">
@@ -98,8 +103,8 @@
                             `).join('')}
                         </div>
                         <div class="card future-box mb-2">
-                            <div class="card-body">
-                                <!-- Reserved for future use -->
+                            <div class="card-body history-container">
+                                <p>Loading history...</p>
                             </div>
                         </div>
                         <button type="button" class="btn btn-sm btn-success add-set">+ Add Set</button>
@@ -108,6 +113,46 @@
                 </div>
             `;
             $('#exercises').append(exerciseHtml);
+            // Fetch exercise history
+            if (id) {
+                fetchExerciseHistory(exerciseIdx, id);
+            } else {
+                // For custom exercises, wait until saved to get ID
+                $(`[data-exercise-idx="${exerciseIdx}"] .history-container`).html('<p>No history (new exercise)</p>');
+            }
+        }
+
+        function fetchExerciseHistory(exerciseIdx, exerciseId) {
+            $.get(`/exercise/${exerciseId}/history`, function(data) {
+                console.log('Exercise history:', data);
+                let historyHtml = '';
+                if (data.workouts.length === 0) {
+                    historyHtml = '<p>No history</p>';
+                } else {
+                    historyHtml = '<ul class="history-list">';
+                    data.workouts.forEach(workout => {
+                        historyHtml += `<li><strong>${workout.date} ${workout.timestamp}</strong><br>`;
+                        workout.sets.forEach(set => {
+                            let setDetails = `Set ${set.set_number} - ${set.weight} kg - ${set.reps} reps`;
+                            if (set.f !== undefined) {
+                                setDetails += ` - f: ${set.f}/6`;
+                            }
+                            if (set.c !== undefined) {
+                                setDetails += ` - c: ${set.c}/6`;
+                            }
+                            historyHtml += `${setDetails}<br>`;
+                            if (set.notes) {
+                                historyHtml += `obs: ${set.notes}<br>`;
+                            }
+                        });
+                        historyHtml += '</li>';
+                    });
+                    historyHtml += '</ul>';
+                }
+                $(`[data-exercise-idx="${exerciseIdx}"] .history-container`).html(historyHtml);
+            }).fail(function() {
+                $(`[data-exercise-idx="${exerciseIdx}"] .history-container`).html('<p>Error loading history</p>');
+            });
         }
 
         $(document).ready(function() {
@@ -208,7 +253,11 @@
 
         $('#customExercise').autocomplete({
             source: '/exercises/autocomplete',
-            minLength: 2
+            minLength: 2,
+            select: function(event, ui) {
+                $('#customExercise').val(ui.item.name);
+                return false;
+            }
         });
 
         $('#addExercise').click(function() {
@@ -222,7 +271,52 @@
 
         $('#workoutForm').submit(function(e) {
             console.log('Form submitted');
-            console.log('Form data:', $(this).serializeArray());
+            let form = $(this);
+            let exercises = form.find('.exercise');
+            let validExercises = 0;
+
+            exercises.each(function() {
+                let exercise = $(this);
+                let exerciseIdx = exercise.data('exercise-idx');
+                let sets = exercise.find('.set');
+                let hasData = false;
+
+                sets.each(function() {
+                    let set = $(this);
+                    let weight = set.find(`input[name="exercises[${exerciseIdx}][sets][${set.data('set-idx')}][weight]"]`).val();
+                    let reps = set.find(`input[name="exercises[${exerciseIdx}][sets][${set.data('set-idx')}][reps]"]`).val();
+                    let f = set.find(`input[name="exercises[${exerciseIdx}][sets][${set.data('set-idx')}][f]"]:checked`).val();
+                    let c = set.find(`input[name="exercises[${exerciseIdx}][sets][${set.data('set-idx')}][c]"]:checked`).val();
+                    let notes = set.find(`input[name="exercises[${exerciseIdx}][sets][${set.data('set-idx')}][notes]"]`).val();
+
+                    if (
+                        (weight && parseFloat(weight) !== 0) ||
+                        (reps && parseInt(reps) !== 0) ||
+                        (f && f !== '-') ||
+                        (c && c !== '-') ||
+                        (notes && notes.trim() !== '')
+                    ) {
+                        hasData = true;
+                    }
+                });
+
+                if (!hasData) {
+                    console.log(`Removing empty exercise ${exerciseIdx}`);
+                    exercise.remove();
+                } else {
+                    validExercises++;
+                }
+            });
+
+            if (validExercises === 0) {
+                e.preventDefault();
+                alert('Please fill in at least one exercise before saving.');
+                console.log('No valid exercises to save');
+                return false;
+            }
+
+            console.log('Valid exercises:', validExercises);
+            console.log('Form data:', form.serializeArray());
         });
     </script>
 </body>

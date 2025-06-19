@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 
@@ -19,7 +19,7 @@ class Workout(db.Model):
     title = db.Column(db.String(100))
     date = db.Column(db.Date)
     duration = db.Column(db.Integer)  # in seconds
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now)  # Local time
 
 class Exercise(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -27,7 +27,7 @@ class Exercise(db.Model):
 
 class WorkoutSet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    workout_id = db.Column(db.Integer, db.ForeignKey('workout.id'))
+    workout_id = db.Column(db.Integer, db.ForeignKey('workout.id', ondelete='CASCADE'))
     exercise_id = db.Column(db.Integer, db.ForeignKey('exercise.id'))
     set_number = db.Column(db.Integer)
     weight = db.Column(db.Float)
@@ -92,7 +92,7 @@ def workout_form_custom():
 def save_workout():
     title = request.form['title']
     duration = int(request.form['duration'])
-    workout = Workout(title=title, date=datetime.now().date(), duration=duration)
+    workout = Workout(title=title, date=datetime.now().date(), duration=duration, timestamp=datetime.now())
     db.session.add(workout)
     db.session.flush()
 
@@ -208,15 +208,77 @@ def workout_details(workout_id):
             exercise = Exercise.query.get(s.exercise_id)
             exercises[s.exercise_id] = {
                 'name': exercise.name,
-                'order': s.set_number,  # Use first set's order as proxy
+                'order': s.set_number,  # Use first set as proxy
                 'sets': []
             }
         exercises[s.exercise_id]['sets'].append(s)
-    # Sort exercises by order, then sort sets within each exercise
     sorted_exercises = sorted(exercises.items(), key=lambda x: x[1]['order'])
     for _, ex in sorted_exercises:
         ex['sets'].sort(key=lambda s: s.set_number)
-    return render_template('workout_details.html', workout=workout, exercises=sorted_exercises)
+    if workout.timestamp:
+        start_time = (workout.timestamp - timedelta(seconds=workout.duration)).strftime('%H:%M:%S')
+        print(f"Workout ID: {workout.id}, Timestamp: {workout.timestamp}, Duration: {workout.duration}, Start Time: {start_time}")
+    else:
+        start_time = "Unknown"
+        print(f"Workout ID: {workout.id}, Timestamp: None, Duration: {workout.duration}, Start Time: Unknown")
+    return render_template('workout_details.html', workout=workout, exercises=sorted_exercises, start_time=start_time)
+
+@app.route('/workout/<int:workout_id>/delete', methods=['POST'])
+def delete_workout(workout_id):
+    workout = Workout.query.get_or_404(workout_id)
+    db.session.delete(workout)
+    db.session.commit()
+    print(f"Deleted workout ID: {workout_id}")
+    return redirect(url_for('past_workouts'))
+
+@app.route('/workouts/backup', methods=['POST'])
+def backup_workouts():
+    workout_ids = request.form.getlist('workout_ids')
+    if not workout_ids:
+        return jsonify({'status': 'error', 'message': 'No workouts selected'}), 400
+    backed_up = []
+    for workout_id in workout_ids:
+        workout = Workout.query.get(workout_id)
+        if workout:
+            sets = WorkoutSet.query.filter_by(workout_id=workout_id).order_by(WorkoutSet.set_number).all()
+            workout_data = {
+                'id': workout.id,
+                'title': workout.title,
+                'date': str(workout.date),
+                'duration': workout.duration,
+                'exercises': []
+            }
+            exercises = {}
+            for s in sets:
+                if s.exercise_id not in exercises:
+                    exercise = Exercise.query.get(s.exercise_id)
+                    exercises[s.exercise_id] = {
+                        'name': exercise.name,
+                        'order': s.set_number,
+                        'sets': []
+                    }
+                exercises[s.exercise_id]['sets'].append({
+                    'set_number': s.set_number,
+                    'weight': s.weight,
+                    'reps': s.reps,
+                    'f': s.f,
+                    'c': s.c,
+                    'notes': s.notes or ''
+                })
+            for _, ex in sorted(exercises.items(), key=lambda x: x[1]['order']):
+                ex['sets'].sort(key=lambda s: s['set_number'])
+                workout_data['exercises'].append({
+                    'name': ex['name'],
+                    'order': ex['order'],
+                    'sets': ex['sets']
+                })
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_file = os.path.join(BACKUP_DIR, f'workout_{workout.id}_{timestamp}.json')
+            with open(backup_file, 'w') as f:
+                json.dump(workout_data, f, indent=2)
+            backed_up.append(workout_id)
+    print(f"Backed up workouts: {backed_up}")
+    return jsonify({'status': 'success', 'message': f'Backed up {len(backed_up)} workouts'})
 
 @app.route('/past_exercises')
 def past_exercises():
@@ -233,6 +295,49 @@ def exercise_history(exercise_id):
         cutoff = datetime.now() - timedelta(days=30)
         sets = [s for s in sets if s.workout.date >= cutoff.date()]
     return render_template('exercise_history.html', exercise=exercise, sets=sets)
+
+@app.route('/exercise/<int:exercise_id>/history')
+def exercise_history_api(exercise_id):
+    exercise = Exercise.query.get_or_404(exercise_id)
+    # Get last 4 workouts with sets for this exercise
+    sets = db.session.query(WorkoutSet, Workout.date, Workout.timestamp, Workout.id).\
+        join(Workout, WorkoutSet.workout_id == Workout.id).\
+        filter(WorkoutSet.exercise_id == exercise_id).\
+        order_by(Workout.timestamp.desc()).\
+        limit(4 * 10).all()  # Assume max 10 sets per workout
+    workouts = {}
+    for s, date, timestamp, workout_id in sets:
+        workout_key = f"{workout_id}_{timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+        if workout_key not in workouts:
+            workouts[workout_key] = {
+                'date': date.strftime('%Y-%m-%d'),
+                'timestamp': timestamp.strftime('%H:%M:%S'),
+                'sets': []
+            }
+        set_data = {
+            'set_number': s.set_number,
+            'weight': s.weight,
+            'reps': s.reps,
+            'notes': s.notes or ''
+        }
+        if s.f is not None:
+            set_data['f'] = s.f
+        if s.c is not None:
+            set_data['c'] = s.c
+        workouts[workout_key]['sets'].append(set_data)
+    # Sort sets within each workout by set_number
+    for workout in workouts.values():
+        workout['sets'].sort(key=lambda x: x['set_number'])
+    # Convert to list, limit to 4
+    workout_list = [
+        {'date': w['date'], 'timestamp': w['timestamp'], 'sets': w['sets']}
+        for k, w in sorted(workouts.items(), key=lambda x: x[0].split('_')[1], reverse=True)[:4]
+    ]
+    print(f"Exercise {exercise_id} history: {workout_list}")  # Debug
+    return jsonify({
+        'exercise_name': exercise.name,
+        'workouts': workout_list
+    })
 
 @app.route('/analysis')
 def analysis():

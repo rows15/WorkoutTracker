@@ -1,0 +1,22 @@
+{
+  "id": 1,
+  "title": "car",
+  "date": "2025-06-18",
+  "duration": 0,
+  "exercises": [
+    {
+      "name": "car",
+      "order": 1,
+      "sets": [
+        {
+          "set_number": 1,
+          "weight": 123.0,
+          "reps": 123,
+          "f": 5,
+          "c": null,
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}
